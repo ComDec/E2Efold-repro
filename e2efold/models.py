@@ -729,18 +729,18 @@ class Lag_PP_mixed(Lag_PP_zero):
     learnable parameters. For the rho, we use neural network to learn
     a position related threshold
     """
-    def __init__(self, steps, k, rho_mode='fix'):
+    def __init__(self, steps, k, rho_mode='fix', L=600):
         super(Lag_PP_mixed, self).__init__(steps, k)
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.steps = steps
         self.k = k
-        # self.s = nn.Parameter(torch.ones(600, 600)*math.log(9.0))
+        # self.s = nn.Parameter(torch.ones(L, L)*math.log(9.0))
         self.s = nn.Parameter(torch.Tensor([math.log(9.0)]))
         # self.s = math.log(9.0)
         self.w = nn.Parameter(torch.randn(1))
         self.rho = nn.Parameter(torch.Tensor([1.0]))
         # self.rho = 1.0
-        self.rho_m = nn.Parameter(torch.randn(600, 600))
+        self.rho_m = nn.Parameter(torch.randn(L, L))
         self.rho_net = nn.Sequential(
                 nn.Linear(3,5),
                 nn.ReLU(),
@@ -758,9 +758,9 @@ class Lag_PP_mixed(Lag_PP_zero):
         # self.lr_decay_beta = torch.Tensor([0.99]).cuda()
         self.rho_mode = rho_mode
 
-        pos_j, pos_i = np.meshgrid(np.arange(1,600+1)/600.0, 
-            np.arange(1,600+1)/600.0)
-        self.rho_pos_fea = torch.cat([torch.Tensor(pos_i).unsqueeze(-1), 
+        pos_j, pos_i = np.meshgrid(np.arange(1,L+1)/float(L),
+            np.arange(1,L+1)/float(L))
+        self.rho_pos_fea = torch.cat([torch.Tensor(pos_i).unsqueeze(-1),
             torch.Tensor(pos_j).unsqueeze(-1)], -1).view(-1, 2).to(self.device)
 
         self.rho_pos_net = nn.Sequential(

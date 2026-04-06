@@ -32,7 +32,7 @@ class RNASSDataGenerator(object):
             self.data = self.upsampling_data()
         self.data_x = np.array([instance[0] for instance in self.data])
         self.data_y = np.array([instance[1] for instance in self.data])
-        self.pairs = np.array([instance[-1] for instance in self.data])
+        self.pairs = np.array([instance[-1] for instance in self.data], dtype=object)
         self.seq_length = np.array([instance[2] for instance in self.data])
         self.len = len(self.data)
         self.seq = list(p.map(encoding2seq, self.data_x))
