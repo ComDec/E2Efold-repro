@@ -1,114 +1,220 @@
-# E2Efold: RNA Secondary Structure Prediction By Learning Unrolled Algorithms
+# E2Efold-repro
 
-pytorch implementation for [RNA Secondary Structure Prediction By Learning Unrolled Algorithms](https://openreview.net/forum?id=S1eALyrYDH) [1]
+Reproduction and cross-dataset evaluation of **E2Efold** (Chen et al., ICLR 2020), a method for RNA secondary structure prediction via learned unrolled augmented Lagrangian optimization.
 
-[[Paper](https://openreview.net/pdf?id=S1eALyrYDH)] [[Presentation](https://iclr.cc/virtual_2020/poster_S1eALyrYDH.html)] [[Slides](http://xinshi-chen.com/papers/slides/iclr2020-e2efold.pdf)]
-[<a href="https://cse.gatech.edu/news/633633/machine-learning-tool-may-help-us-better-understand-rna-viruses">GaTech news</a>]
-[<a href="https://www.jiqizhixin.com/articles/2020-02-18-8">Chinese news</a>]
-[<a href="https://mp.weixin.qq.com/s/eyWlQdRqrnnxOKv0TF6gmA">Chinese introduction</a>]
-[<a href="https://github.com/ml4bio/e2efold/blob/master/slides_and_articles/long_abstract.pdf">Plain explanation</a>]
+Original paper: [RNA Secondary Structure Prediction By Learning Unrolled Algorithms](https://openreview.net/pdf?id=S1eALyrYDH)  
+Original code: [ml4bio/e2efold](https://github.com/ml4bio/e2efold)
 
+---
 
-## Setup
+## Method Summary
 
-### Install the package
-The environment that we use is given in `environment.yml`. You can consider to use exactly the same environment by running the following command.
-```
-Conda env create -f environment.yml
-```
+E2Efold predicts RNA base-pairing contact maps from sequence alone through a two-component architecture trained end-to-end:
 
-Please navigate to the root of this repository, and run the following command to install the package e2efold.
-```
-source activate rna_ss # activate the enviornment
-pip install -e .
-```
+1. **Score network** (`ContactAttention_simple_fix_PE`): A 1D convolutional + Transformer encoder network that maps the one-hot encoded RNA sequence (with positional encoding) to an L x L raw score matrix, where L is the sequence length. Each entry u_ij represents the model's estimate of the utility of pairing positions i and j.
 
-### Data
+2. **Post-processing network** (`Lag_PP_mixed`): A differentiable augmented Lagrangian solver that refines the raw score matrix into a valid contact map. It unrolls T = 20 steps of constrained optimization, where the constraint sum_j(a_ij) <= 1 enforces that each nucleotide pairs with at most one other. The contact matrix a is constructed as a = a_hat^2 * m, ensuring non-negativity and valid base-pair types (AU, CG, GU). The parameters alpha, beta, rho (sparsity threshold) are all learnable.
 
-Please download the RNA secondary structure [data](https://gocuhk-my.sharepoint.com/:f:/g/personal/yuli_cuhk_edu_hk/EsmL09vDN3RDucN4I3JyOdEBpD4M4ToqShvYu57-1nOFoA?e=236Pix) and put all the `.tgz` files in the `/data` folder. Then run:
-```
-tar -xzf rnastralign_all.tgz
-tar -xzf rnastralign_all_600.tgz
-tar -xzf archiveII_all.tgz
-```
-These files contain the processed data. As a reference, the codes for preprocessing the data are also given in this `/data` folder.
+**Training**: Two stages. Stage 1 pre-trains the score network with weighted BCE loss (`pos_weight=300`). Stage 3 fine-tunes both networks jointly, using a differentiable F1 loss on the contact map predictions across all unrolled steps. Gradients are accumulated over 30 forward passes before each optimizer step.
 
-### Folder structure
+---
 
-Finally the project should have the following folder structure:
+## Results
 
-```
-e2efold
-|___e2efold  # source code
-|___e2efold_productive  # productive code for handling new sequences
-|___data  # data
-    |___archiveII_all
-    |___rnastralign_all_600
-    |___rnastralign_all
-    |___preprocess_archiveii.py  # just as a reference. no need to run.
-    |......
-|___models_ckpt  # trained models
-|___results
-|___experiment_archiveii
-|___experiment_rnastralign
-|___slides_and_articles    # slides and articles related to the project 
-...
-```
+### Anchor: RNAStralign Reproduction
 
-## Prediction for user's input sequence
+We first reproduce the paper's reported results on RNAStralign to validate our setup. We use the same architecture, hyperparameters, and training procedure as the original paper. Due to unavailability of the original non-redundant test split, we evaluate on a held-out i.i.d. validation set (10% of 20,923 samples).
 
-To directly use our trained model to make prediction for any RNA sequence, please refer to the information in `/e2efold_productive` folder.
+| Metric | Paper (Table 2) | This Reproduction |
+|--------|:---:|:---:|
+| Precision | 0.866 | 0.809 |
+| Recall | 0.788 | 0.868 |
+| **F1** | **0.821** | **0.834** |
 
-## Reproduce experimental results in the paper
+The slight F1 difference (+0.013) is expected: our i.i.d. split is easier than the paper's non-redundant test set.
 
-To reproduce the experiments in our paper, please refer to the following steps:
+### Cross-Dataset Evaluation
 
-## Test with trained model
-You can download the [pretrained models](https://gocuhk-my.sharepoint.com/:f:/g/personal/yuli_cuhk_edu_hk/Ekuec1yiSc9Jp7leSEYtsvABJyhIVXAblV0wb-8PrTezMg?e=eqXvzd) and put the `.pt` files in the folder `/models_ckpt`.
+We apply E2Efold (with identical hyperparameters) to two additional datasets to assess generalization. All experiments use **pure sequence input only** --- no external structure predictions or evolutionary features.
 
-### RNAStralign
-You can navigate to the `/experiment_ranstralign` folder and run the following command to test the model on RNAStralign test dataset:
-```
-python e2e_learning_stage3.py -c config.json --test True
-python e2e_learning_stage3_rnastralign_all_long.py -c config_long.json --test True
+| Dataset | Train | Val | Test | F1 | Precision | AUROC | AUPRC |
+|---------|------:|----:|-----:|:---:|:---:|:---:|:---:|
+| **RNAStralign** | 16,738 | 2,092 | --- | 0.834 | 0.809 | --- | --- |
+| **Rivals** | 3,166 | 592 | 430 | 0.054 | 0.045 | 0.834 | 0.041 |
+| **bpRNA-new (TS0)** | 10,814 | 1,300 | 1,305 | 0.232 | 0.168 | 0.939 | 0.182 |
+
+*Metrics: per-sample binary precision, F1, AUROC, AUPRC at threshold 0.5, averaged over all test samples. Consistent with the `secondary_structure_metircs` function from the DeepRNA benchmark.*
+
+**Key observations**:
+- E2Efold achieves strong performance on RNAStralign (F1=0.83), confirming the original paper.
+- On the more diverse bpRNA dataset (TS0), F1 drops to 0.23 despite high AUROC (0.94), indicating the model discriminates contacts from non-contacts well but fails at the precision-recall trade-off on out-of-distribution data.
+- On Rivals TestSetB, performance is near-random (F1=0.05), reflecting severe distribution shift.
+- These results are consistent with E2Efold's known architectural limitations: position-dependent learned parameters and a Transformer encoder tuned for RNAStralign's 8 RNA families do not generalize to diverse RNA populations.
+
+---
+
+## Changes from the Original Repository
+
+We made **exactly 2 minimal changes** to the original E2Efold source code (`git diff` shown below). Everything else is additive (new files only).
+
+### Change 1: NumPy compatibility (`e2efold/data_generator.py`, 1 line)
+
+```diff
+- self.pairs = np.array([instance[-1] for instance in self.data])
++ self.pairs = np.array([instance[-1] for instance in self.data], dtype=object)
 ```
 
-### ArchiveII
-You can navigate to the `/experiment_archiveii` folder and run the following command to test the model on ArchiveII data. Note that the saved model is trained on the RNAStralign database.
-```
-# For sequences shorter than 600
-python e2e_learning_stage3.py -c config.json
+**Reason**: NumPy >= 1.24 raises `ValueError` on arrays with variable-length elements. Each RNA has a different number of base pairs, making this a ragged array. Adding `dtype=object` restores the original behavior.
 
-# For sequences from 600 to 1800, not performing well on long sequence in archiveii
-python e2e_learning_stage3_rnastralign_all_long.py -c config_long.json
-```
+### Change 2: Sequence length parameterization (`e2efold/models.py`, 6 lines)
 
-## Reproduce the training process or re-train the model on a new dataset
-
-The model is trained on the RNAstralign training set. To reproduce the training process, you can navigate to the folder
-`e2efold_rnastralign` and run:
-```
-# For sequences shorter than 600
-python e2e_learning_stage1.py -c config.json  # pre-train the score network
-python e2e_learning_stage3.py -c config.json  # end-to-end training
-
-# For sequences from 600 to 1800 
-python e2e_learning_stage1_rnastralign_all_long.py -c config_long.json 
-python e2e_learning_stage3_rnastralign_all_long.py -c config_long.json 
+```diff
+- def __init__(self, steps, k, rho_mode='fix'):
++ def __init__(self, steps, k, rho_mode='fix', L=600):
+      ...
+-     self.rho_m = nn.Parameter(torch.randn(600, 600))
++     self.rho_m = nn.Parameter(torch.randn(L, L))
 ```
 
-Given the training logic implemented in the above python files, you can modify the data generator to re-train the model on other datasets. Our data generator in defined in `e2efold/data_generator.py`. You could probably choose to define a Sub Class based on the Class `RNASSDataGenerator`.
+**Reason**: `Lag_PP_mixed` hardcodes a 600 x 600 learnable sparsity matrix `rho_m`. When the data is padded to a different length (e.g., 768 for Rivals, 499 for bpRNA), this causes a dimension mismatch. We add an `L` parameter with **default value 600**, so existing code calling `Lag_PP_mixed(steps, k)` behaves identically.
 
+---
+
+## Reproduction Guide
+
+### Environment
+
+```bash
+pip install torch               # tested with PyTorch 2.8.0+cu128
+pip install munch torcheval     # config parsing + evaluation metrics
+pip install -e .                # install e2efold package
+```
+
+We use Python 3.13 + PyTorch 2.8 instead of the original Python 3.7 + PyTorch 1.2, requiring the two compatibility fixes above.
+
+### Step 1: Reproduce RNAStralign (anchor result)
+
+```bash
+# Preprocess (converts mxfold2 pickle format to E2Efold namedtuple format)
+python3 data/preprocess_rnastralign_from_mxfold2.py
+
+# Train
+cd experiment_rnastralign_repro
+python3 e2e_learning_stage1.py -c config.json    # Stage 1: ~2h on H100
+python3 e2e_learning_stage3.py -c config.json    # Stage 3: ~1.5h
+```
+
+### Step 2: Train on Rivals
+
+```bash
+python3 data/preprocess_rivals.py
+
+cd experiment_rivals
+python3 e2e_learning_stage1.py -c config.json    # Stage 1: ~25min
+python3 e2e_learning_stage3.py -c config.json    # Stage 3: ~15min
+python3 evaluate_rivals.py -c config.json        # Evaluate on TestSetA + TestSetB
+```
+
+### Step 3: Train on bpRNA (TR0 / VL0 / TS0)
+
+```bash
+python3 data/preprocess_bprna.py
+
+cd experiment_bprna
+python3 e2e_learning_stage1.py -c config.json    # Stage 1: ~2h
+python3 e2e_learning_stage3.py -c config.json    # Stage 3: ~1.5h
+python3 evaluate.py -c config.json               # Evaluate on VL0 + TS0
+```
+
+### GPU Selection
+
+Edit `"gpu": "0"` in each `config.json` to select the desired CUDA device. Check availability with `nvidia-smi`.
+
+---
+
+## Hyperparameters
+
+All experiments use identical hyperparameters (the paper's recommended defaults), ensuring a fair comparison across datasets:
+
+| Parameter | Value | Meaning |
+|-----------|:-----:|---------|
+| `model_type` | `att_simple_fix` | Score network: Conv1D + Transformer + fixed positional encoding |
+| `pp_model` | `mixed` | Post-processing: learned per-position sparsity threshold |
+| `u_net_d` | 10 | Hidden dimension of the score network |
+| `pp_steps` | 20 | Number of unrolled augmented Lagrangian steps |
+| `pp_loss` | `f1` | Differentiable F1 loss for end-to-end training |
+| `pos_weight` | 300 | Positive class weight in BCE loss (compensates contact sparsity) |
+| `batch_size_stage_1` | 20 | Batch size for Stage 1 (score network pre-training) |
+| `BATCH_SIZE` | 8 | Batch size for Stage 3 (end-to-end fine-tuning) |
+| `epoches_first` | 50 | Stage 1 training epochs |
+| `epoches_third` | 10 | Stage 3 training epochs |
+| Grad accumulation | 30 | Optimizer step every 30 forward passes in Stage 3 |
+| Optimizer | Adam | Default learning rate (0.001) |
+| `rho_per_position` | `matrix` | Learnable L x L sparsity matrix |
+| `step_gamma` | 1 | No loss decay across unrolled steps |
+| Seed | 0 | `seed_torch(0)` for full reproducibility |
+
+---
+
+## Data Preprocessing
+
+Each dataset comes in a different format. We provide conversion scripts that transform them into E2Efold's expected `RNA_SS_data` namedtuple format without modifying the data content:
+
+| Script | Input Format | Dataset |
+|--------|-------------|---------|
+| `data/preprocess_rnastralign_from_mxfold2.py` | mxfold2 pickle (`{id, seq, label}`) | RNAStralign |
+| `data/preprocess_rivals.py` | Rivals pickle (`{id, seq, label, matrix}`) | Rivals |
+| `data/preprocess_bprna.py` | bpRNA pickle (`{id, seq, label}`) | bpRNA TR0/VL0/TS0 |
+
+The conversion is strictly format transformation: one-hot encode the sequence, extract base pairs from the contact map, pad to the global maximum length, and package as `RNA_SS_data(seq, ss_label, length, name, pairs)`.
+
+**No filtering, augmentation, or modification of the data is performed.**
+
+---
+
+## Repository Structure
+
+```
+e2efold/                           # Original source code (2 files modified)
+    models.py                      # Lag_PP_mixed: L parameterization
+    data_generator.py              # NumPy ragged array fix
+data/
+    preprocess_rivals.py           # Rivals format conversion
+    preprocess_bprna.py            # bpRNA format conversion
+    preprocess_rnastralign_from_mxfold2.py
+experiment_rnastralign_repro/      # RNAStralign anchor experiment
+experiment_rivals/                 # Rivals experiment
+experiment_bprna/                  # bpRNA experiment
+    config.json                    # Hyperparameters
+    e2e_learning_stage1.py         # Stage 1 training
+    e2e_learning_stage3.py         # Stage 3 training
+    evaluate.py                    # Dual-metric evaluation
+CHANGE_LOG.md                      # All modifications documented
+Benchmark.md                       # Full results with reproduction commands
+REPRODUCTION.md                    # Technical details
+```
+
+---
+
+## Evaluation Protocol
+
+We report two sets of metrics for transparency:
+
+1. **DeepRNA metrics** (primary): `binary_precision`, `binary_f1_score`, `binary_auroc`, `binary_auprc` from `torcheval`, matching the `secondary_structure_metircs` function in the DeepRNA benchmark. Per-sample computation on the flattened L' x L' contact map (where L' is the actual sequence length, excluding padding), averaged across all test samples.
+
+2. **E2Efold native metrics** (secondary): `evaluate_exact` (strict position match) and `evaluate_shifted` (allowing 1-position shift), from the original codebase.
+
+Both metric sets use a hard threshold of 0.5 on the model's continuous output, consistent with the original inference pipeline.
+
+---
 
 ## Citation
-If you found this library useful in your research, please consider citing
-```
-@article{chen2020rna,
+
+```bibtex
+@inproceedings{chen2020rna,
   title={RNA Secondary Structure Prediction By Learning Unrolled Algorithms},
   author={Chen, Xinshi and Li, Yu and Umarov, Ramzan and Gao, Xin and Song, Le},
-  journal={arXiv preprint arXiv:2002.05810},
+  booktitle={International Conference on Learning Representations},
   year={2020}
 }
 ```
-## References
-[1] Xinshi Chen*, Yu Li*, Ramzan Umarov, Xin Gao, Le Song. "RNA Secondary Structure Prediction By Learning Unrolled Algorithms." *In International Conference on Learning Representations.* 2020.
