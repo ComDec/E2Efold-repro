@@ -23,9 +23,12 @@ E2Efold predicts RNA base-pairing contact maps from sequence alone through a two
 
 ### Anchor: RNAStralign Reproduction
 
-We first reproduce the paper's reported results on RNAStralign to validate our setup. We use the same architecture, hyperparameters, and training procedure as the original paper. Due to unavailability of the original non-redundant test split, we evaluate on a held-out i.i.d. validation set (10% of 20,923 samples).
+We first reproduce the paper's reported results on RNAStralign to validate our setup. The original non-redundant test split is unavailable (requires SharePoint download), so we use an 80/10/10 random split of the 20,923-sample RNAStralign training set from the mxfold2 repository.
 
-| Metric | Paper (Table 2) | This Reproduction |
+- **Train**: 16,738 samples (80%) | **Val**: 2,092 samples (10%) | **Test**: 2,093 samples (10%)
+- Max sequence length: 600 bp
+
+| Metric | Paper (Table 2, non-redundant test) | Ours (i.i.d. val split) |
 |--------|:---:|:---:|
 | Precision | 0.866 | 0.809 |
 | Recall | 0.788 | 0.868 |
@@ -35,20 +38,44 @@ The slight F1 difference (+0.013) is expected: our i.i.d. split is easier than t
 
 ### Cross-Dataset Evaluation
 
-We apply E2Efold (with identical hyperparameters) to two additional datasets to assess generalization. All experiments use **pure sequence input only** --- no external structure predictions or evolutionary features.
+We apply E2Efold (with identical hyperparameters) to two additional datasets. All experiments use **pure sequence input only** --- no external structure predictions or evolutionary features. All metrics are per-sample averages, consistent with the `secondary_structure_metircs` function from the DeepRNA benchmark (threshold = 0.5).
 
-| Dataset | Train | Val | Test | F1 | Precision | AUROC | AUPRC |
-|---------|------:|----:|-----:|:---:|:---:|:---:|:---:|
-| **RNAStralign** | 16,738 | 2,092 | --- | 0.834 | 0.809 | --- | --- |
-| **Rivals** | 3,166 | 592 | 430 | 0.054 | 0.045 | 0.834 | 0.041 |
-| **bpRNA-new (TS0)** | 10,814 | 1,300 | 1,305 | 0.232 | 0.168 | 0.939 | 0.182 |
+#### Rivals Dataset
 
-*Metrics: per-sample binary precision, F1, AUROC, AUPRC at threshold 0.5, averaged over all test samples. Consistent with the `secondary_structure_metircs` function from the DeepRNA benchmark.*
+- **Train**: TrainSetA (3,166 samples, 10--734 bp)
+- **Val**: TestSetA (592 samples, 10--768 bp)
+- **Test**: TestSetB (430 samples, 27--244 bp)
+- Max padded length: 768 bp
+
+| Split | Role | Precision | F1 | AUROC | AUPRC |
+|-------|------|:---:|:---:|:---:|:---:|
+| TestSetA | Val | 0.4012 | 0.4206 | 0.9412 | 0.3769 |
+| **TestSetB** | **Test** | **0.0454** | **0.0535** | **0.8339** | **0.0406** |
+
+#### bpRNA-new (TR0 / VL0 / TS0)
+
+- **Train**: TR0 (10,814 samples, 33--498 bp)
+- **Val**: VL0 (1,300 samples, 33--497 bp)
+- **Test**: TS0 (1,305 samples, 22--499 bp)
+- Max padded length: 499 bp
+
+| Split | Role | Precision | F1 | AUROC | AUPRC |
+|-------|------|:---:|:---:|:---:|:---:|
+| VL0 | Val | 0.1661 | 0.2287 | 0.9394 | 0.1811 |
+| **TS0** | **Test** | **0.1684** | **0.2318** | **0.9393** | **0.1824** |
+
+#### Summary
+
+| Dataset | Val F1 | Test F1 | Test AUROC |
+|---------|:---:|:---:|:---:|
+| **RNAStralign** (anchor) | 0.834 | --- | --- |
+| **Rivals** | 0.421 | 0.054 | 0.834 |
+| **bpRNA-new** | 0.229 | 0.232 | 0.939 |
 
 **Key observations**:
-- E2Efold achieves strong performance on RNAStralign (F1=0.83), confirming the original paper.
-- On the more diverse bpRNA dataset (TS0), F1 drops to 0.23 despite high AUROC (0.94), indicating the model discriminates contacts from non-contacts well but fails at the precision-recall trade-off on out-of-distribution data.
-- On Rivals TestSetB, performance is near-random (F1=0.05), reflecting severe distribution shift.
+- E2Efold achieves strong performance on RNAStralign (Val F1 = 0.83), confirming the original paper.
+- On bpRNA TS0, F1 drops to 0.23 despite high AUROC (0.94), indicating the model discriminates contacts from non-contacts but fails at the precision-recall trade-off on diverse RNA data.
+- On Rivals TestSetB, performance is near-random (F1 = 0.05), reflecting severe distribution shift between TrainSetA and TestSetB.
 - These results are consistent with E2Efold's known architectural limitations: position-dependent learned parameters and a Transformer encoder tuned for RNAStralign's 8 RNA families do not generalize to diverse RNA populations.
 
 ---
