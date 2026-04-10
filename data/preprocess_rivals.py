@@ -116,7 +116,10 @@ def process_dataset(pkl_path, maxlen):
 
 
 def main():
-    rivals_dir = '/home/xiwang/project/develop/data/rivals'
+    # Data root can be overridden via E2EFOLD_DATA_ROOT env var.
+    # Expected layout: $E2EFOLD_DATA_ROOT/rivals/{TrainSetA,TestSetA,TestSetB}-addss.pkl
+    data_root = os.environ.get('E2EFOLD_DATA_ROOT', '/home/xiwang/project/develop/data')
+    rivals_dir = os.path.join(data_root, 'rivals')
     output_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'rivals')
 
     # Use addss variant (base reference, no extra features)

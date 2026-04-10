@@ -3,6 +3,12 @@ data/rivals/
 data/bprna_tr0/
 data/rnastralign_all_600/
 data/archiveii_short/
+data/archiveii_full/
+data/unirna_ss/
+data/ipknot/
+
+# Experiment logs
+logs/
 
 # Original data directories (downloaded separately)
 data/rnastralign_all/
@@ -12,6 +18,16 @@ models_ckpt/*.pt
 
 # Training logs
 *.log
+
+# Test predictions (large binary files)
+test_predictions.pkl
+test_new_predictions.pkl
+experiment_*/test_predictions.pkl
+experiment_*/test_new_predictions.pkl
+
+# Reviewer release staging (should not be in git)
+release/
+ss_dataset/
 
 # Python cache
 __pycache__/

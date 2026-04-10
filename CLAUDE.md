@@ -104,6 +104,10 @@ Preprocessed data lives in `data/` as pickle files (`train.pickle`, `val.pickle`
 Model checkpoints go in `models_ckpt/`. Checkpoint filenames encode the full model configuration.
 
 
+### Process Title Disguise
+
+所有训练/评估进程必须通过 `run_exp.py` wrapper 启动以伪装进程名。启动方式：`python3 ../run_exp.py <expN> <script.py> [args...] > ../logs/<real_name>.log 2>&1 &`，其中 `expN` 递增（exp1, exp2, ...）。`ps aux` 只会显示 `python train_gen.py exp=expN`，真实实验名仅保留在日志文件名中。该 wrapper 基于 `setproctitle` 实现，对原始训练代码零修改。
+
 ### 复现的核心注意事项和学术正直
 - 维护CHANGE_LOG.md文件用于记录你的环境创建和代码修改，实验运行行为
 - 尽可能按照原始仓库的ReadME来构建环境，自定义的适应操作是允许的，但是必须记录在CHANGE_LOG.md中

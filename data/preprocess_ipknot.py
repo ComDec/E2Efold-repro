@@ -1,6 +1,12 @@
 """
-Preprocess bpRNA TR0/VL0/TS0 (mxfold2 format) into e2efold pickle format.
-Uses only 'seq' and 'label' fields (pure sequence, no matrix features).
+Preprocess iPKnot dataset into e2efold pickle format.
+
+Source:
+  Train: /home/xiwang/project/develop/data/ipkont/bpRNA-TR0.pkl
+  Val/Test: /home/xiwang/project/develop/data/ipkont/bpRNA-PK-TS0-1K.pkl
+  (val and test are the same file per dataset_instruction)
+
+Output: data/ipknot/{train,val,test}.pickle
 """
 import os
 import collections
@@ -84,41 +90,50 @@ def process_dataset(pkl_path, maxlen):
 
 def main():
     # Data root can be overridden via E2EFOLD_DATA_ROOT env var.
-    # Expected layout: $E2EFOLD_DATA_ROOT/mxfold2/{TR0,VL0,TS0}-canonicals.pkl
+    # Expected layout: $E2EFOLD_DATA_ROOT/ipkont/{bpRNA-TR0, bpRNA-PK-TS0-1K}.pkl
     data_root = os.environ.get('E2EFOLD_DATA_ROOT', '/home/xiwang/project/develop/data')
-    src = os.path.join(data_root, 'mxfold2')
-    output_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'bprna_tr0')
+    src = os.path.join(data_root, 'ipkont')
+    output_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ipknot')
 
-    files = {
-        'train': os.path.join(src, 'TR0-canonicals.pkl'),
-        'val':   os.path.join(src, 'VL0-canonicals.pkl'),
-        'test':  os.path.join(src, 'TS0-canonicals.pkl'),
-    }
+    train_path = os.path.join(src, 'bpRNA-TR0.pkl')
+    test_path = os.path.join(src, 'bpRNA-PK-TS0-1K.pkl')
 
-    # Determine global max length
+    # Determine global max length across train AND test
     print("Scanning all datasets for max length...")
     all_lens = []
-    for split, path in files.items():
+    for name, path in [('train', train_path), ('test', test_path)]:
         with open(path, 'rb') as f:
             data = pickle.load(f)
         lens = [len(d['seq']) for d in data]
         all_lens.extend(lens)
-        print(f"  {split}: {len(lens)} samples, min={min(lens)}, max={max(lens)}, mean={np.mean(lens):.1f}")
+        print(f"  {name}: {len(lens)} samples, min={min(lens)}, max={max(lens)}, mean={np.mean(lens):.1f}")
 
     maxlen = max(all_lens)
-    print(f"Global max length: {maxlen}")
+    if maxlen % 2 != 0:
+        maxlen += 1
+    print(f"Global max length: {maxlen} (padded)")
 
     os.makedirs(output_dir, exist_ok=True)
 
-    for split, path in files.items():
-        print(f"\nProcessing {split}...")
-        ss_list = process_dataset(path, maxlen)
+    # Process train
+    print("\nProcessing train...")
+    train_list = process_dataset(train_path, maxlen)
+    train_out = os.path.join(output_dir, 'train.pickle')
+    with open(train_out, 'wb') as f:
+        cPickle.dump(train_list, f)
+    print(f"  Saved {len(train_list)} samples -> {train_out}")
+
+    # Process val and test (same source file per dataset_instruction)
+    print("\nProcessing val/test (same source: bpRNA-PK-TS0-1K.pkl)...")
+    test_list = process_dataset(test_path, maxlen)
+    for split in ['val', 'test']:
         out_path = os.path.join(output_dir, f'{split}.pickle')
         with open(out_path, 'wb') as f:
-            cPickle.dump(ss_list, f)
-        print(f"  Saved {len(ss_list)} samples -> {out_path}")
+            cPickle.dump(test_list, f)
+        print(f"  Saved {len(test_list)} samples -> {out_path}")
 
     print(f"\nDone! Data saved to {output_dir}, padded to {maxlen}")
+    print("NOTE: val.pickle and test.pickle are identical (same source file)")
 
 
 if __name__ == '__main__':

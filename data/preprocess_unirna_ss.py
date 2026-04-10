@@ -1,6 +1,9 @@
 """
-Preprocess bpRNA TR0/VL0/TS0 (mxfold2 format) into e2efold pickle format.
+Preprocess UniRNA-SS (all_data_1024_0.75) into e2efold pickle format.
 Uses only 'seq' and 'label' fields (pure sequence, no matrix features).
+
+Source: /home/xiwang/project/develop/data/all_data_1024_0.75/{train,valid,test}.pkl
+Output: data/unirna_ss/{train,val,test}.pickle
 """
 import os
 import collections
@@ -84,18 +87,18 @@ def process_dataset(pkl_path, maxlen):
 
 def main():
     # Data root can be overridden via E2EFOLD_DATA_ROOT env var.
-    # Expected layout: $E2EFOLD_DATA_ROOT/mxfold2/{TR0,VL0,TS0}-canonicals.pkl
+    # Expected layout: $E2EFOLD_DATA_ROOT/all_data_1024_0.75/{train,valid,test}.pkl
     data_root = os.environ.get('E2EFOLD_DATA_ROOT', '/home/xiwang/project/develop/data')
-    src = os.path.join(data_root, 'mxfold2')
-    output_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'bprna_tr0')
+    src = os.path.join(data_root, 'all_data_1024_0.75')
+    output_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'unirna_ss')
 
     files = {
-        'train': os.path.join(src, 'TR0-canonicals.pkl'),
-        'val':   os.path.join(src, 'VL0-canonicals.pkl'),
-        'test':  os.path.join(src, 'TS0-canonicals.pkl'),
+        'train': os.path.join(src, 'train.pkl'),
+        'val':   os.path.join(src, 'valid.pkl'),
+        'test':  os.path.join(src, 'test.pkl'),
     }
 
-    # Determine global max length
+    # Determine global max length across all splits
     print("Scanning all datasets for max length...")
     all_lens = []
     for split, path in files.items():
@@ -106,7 +109,9 @@ def main():
         print(f"  {split}: {len(lens)} samples, min={min(lens)}, max={max(lens)}, mean={np.mean(lens):.1f}")
 
     maxlen = max(all_lens)
-    print(f"Global max length: {maxlen}")
+    if maxlen % 2 != 0:
+        maxlen += 1
+    print(f"Global max length: {maxlen} (padded)")
 
     os.makedirs(output_dir, exist_ok=True)
 

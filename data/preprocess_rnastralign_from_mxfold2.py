@@ -115,9 +115,11 @@ def process_items(items, maxlen):
 def main():
     data_dir = os.path.dirname(os.path.abspath(__file__))
 
-    # Paths
-    rnastralign_pkl = '/data/xiwang_home/project/develop/data/mxfold2/RNAStrAlign600-train.pkl'
-    archiveii_pkl = '/data/xiwang_home/project/develop/data/mxfold2/archiveII.pkl'
+    # Data root can be overridden via E2EFOLD_DATA_ROOT env var.
+    # Expected layout: $E2EFOLD_DATA_ROOT/mxfold2/{RNAStrAlign600-train,archiveII}.pkl
+    data_root = os.environ.get('E2EFOLD_DATA_ROOT', '/home/xiwang/project/develop/data')
+    rnastralign_pkl = os.path.join(data_root, 'mxfold2', 'RNAStrAlign600-train.pkl')
+    archiveii_pkl = os.path.join(data_root, 'mxfold2', 'archiveII.pkl')
 
     maxlen = 600  # Fixed max length for short sequences
 
