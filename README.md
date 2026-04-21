@@ -147,27 +147,24 @@ The evaluation is **CPU only** and runs directly on the saved `test_predictions.
 
 ```bash
 # DeepRNA path can be overridden via DEEPRNA_PATH env var; default matches author setup.
-DEEPRNA_PATH=/home/xiwang/project/develop/deeprna \
-python3 evaluate_pseudoknot.py \
-    --predictions experiment_archiveii_full/test_predictions.pkl \
-    --dataset_name "ArchiveII (≤600bp, n=3911)"
+export DEEPRNA_PATH=/home/xiwang/project/develop/deeprna
 
-DEEPRNA_PATH=/home/xiwang/project/develop/deeprna \
-python3 evaluate_pseudoknot.py \
-    --predictions experiment_ipknot/test_predictions.pkl \
-    --dataset_name "iPKnot (bpRNA-PK-TS0-1K)"
+python3 evaluate_pseudoknot.py --predictions experiment_unirna_ss/test_predictions.pkl --dataset_name "UniRNA-SS"
+python3 evaluate_pseudoknot.py --predictions experiment_archiveii_full/test_predictions.pkl --dataset_name "ArchiveII"
+python3 evaluate_pseudoknot.py --predictions experiment_ipknot/test_predictions.pkl --dataset_name "iPKnot"
 ```
 
-Wall time: ~12 min ArchiveII, ~10 min iPKnot (O(L³) Python loop; not optimized).
+Wall time: UniRNA-SS ~1 min, ArchiveII ~12 min, iPKnot ~10 min (O(L³) Python loop).
 
 Expected output:
 
 | Benchmark | n_total | n_pk | score (F1) | score_pk | pk_sen | pk_ppv | **pk_f1** |
 |---|---|---|:---:|:---:|:---:|:---:|:---:|
+| UniRNA-SS | 1041 | 164 (15.8%) | 0.1092 | 0.0453 | 0.0012 | 0.0019 | **0.0013** |
 | ArchiveII (≤600bp) | 3911 | 1039 (26.6%) | 0.4463 | 0.1061 | 0.0041 | 0.0076 | **0.0038** |
 | iPKnot (bpRNA-PK-TS0-1K) | 2914 | 353 (12.1%) | 0.1246 | 0.0577 | 0.0069 | 0.0125 | **0.0087** |
 
-**Interpretation**: E2Efold's Lagrangian post-processing has no explicit crossing-pair representation — each position is constrained to pair with at most one other, but no term encodes or encourages crossings. `pk_f1 ≈ 0.01` is essentially a floor (see [`Benchmark.md`](Benchmark.md) §8 for the full discussion).
+**Interpretation**: E2Efold's Lagrangian post-processing has no explicit crossing-pair representation — each position is constrained to pair with at most one other, but no term encodes or encourages crossings. `pk_f1` ranges from 0.001 to 0.009 — essentially a floor on all three datasets (see [`Benchmark.md`](Benchmark.md) §8 for the full discussion including comparison to UFold).
 
 ---
 

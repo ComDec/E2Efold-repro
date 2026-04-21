@@ -82,13 +82,19 @@ set_gpu experiment_bprna_s1/config.json
 
 # ---- Pseudoknot-aware evaluation (CPU only) ----
 
-echo; echo "[PK-1] ArchiveII pseudoknot metrics"
+echo; echo "[PK-1] UniRNA-SS pseudoknot metrics"
+python3 evaluate_pseudoknot.py \
+    --predictions experiment_unirna_ss/test_predictions.pkl \
+    --dataset_name "UniRNA-SS (n=1041)" \
+    | tee logs/unirna_ss_pseudoknot.log
+
+echo; echo "[PK-2] ArchiveII pseudoknot metrics"
 python3 evaluate_pseudoknot.py \
     --predictions experiment_archiveii_full/test_predictions.pkl \
     --dataset_name "ArchiveII (≤600bp, n=3911)" \
     | tee logs/archiveii_pseudoknot.log
 
-echo; echo "[PK-2] iPKnot pseudoknot metrics"
+echo; echo "[PK-3] iPKnot pseudoknot metrics"
 python3 evaluate_pseudoknot.py \
     --predictions experiment_ipknot/test_predictions.pkl \
     --dataset_name "iPKnot (bpRNA-PK-TS0-1K)" \

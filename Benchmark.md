@@ -459,11 +459,11 @@ No additional training — the Stage-1 checkpoint from §3 is reused directly.
 
 ---
 
-## 8. Pseudoknot-aware evaluation (ArchiveII + iPKnot)
+## 8. Pseudoknot-aware evaluation (UniRNA-SS + ArchiveII + iPKnot)
 
 ### Motivation
 
-iPKnot is explicitly a pseudoknot benchmark (test set = `bpRNA-PK-TS0-1K.pkl`, "PK" = pseudoknot), and ArchiveII contains RNA families known to have crossing base pairs. The standard F1 reported in §5 and §6 does not separate pseudoknot performance from standard nested-base-pair performance. This section uses the DeepRNA pseudoknot module (`deeprna.metrics.pseudoknot.evaluate_structure_metrics`) — applied to the exact same `test_predictions.pkl` artifacts as §5 and §6, with zero re-inference — to quantify pseudoknot behavior.
+iPKnot is explicitly a pseudoknot benchmark (test set = `bpRNA-PK-TS0-1K.pkl`, "PK" = pseudoknot), ArchiveII contains RNA families known to have crossing base pairs, and UniRNA-SS also contains PK-containing samples. The standard F1 reported in §4–§6 does not separate pseudoknot performance from standard nested-base-pair performance. This section uses the DeepRNA pseudoknot module (`deeprna.metrics.pseudoknot.evaluate_structure_metrics`) — applied to the exact same `test_predictions.pkl` artifacts as §4–§6, with zero re-inference — to quantify pseudoknot behavior.
 
 ### Metric definitions (from `pseudoknot.py`)
 
@@ -474,7 +474,8 @@ iPKnot is explicitly a pseudoknot benchmark (test set = `bpRNA-PK-TS0-1K.pkl`, "
 ### Setup
 
 - **Script**: `evaluate_pseudoknot.py` (new, standalone, CPU-only, top-level of the repo).
-- **Input**: saved predictions from the §5 / §6 runs — NOT recomputed from checkpoint.
+- **Input**: saved predictions from the §4 / §5 / §6 runs — NOT recomputed from checkpoint.
+  - `experiment_unirna_ss/test_predictions.pkl` (1,041 samples)
   - `experiment_archiveii_full/test_predictions.pkl` (3,911 samples, L≤600)
   - `experiment_ipknot/test_predictions.pkl` (2,914 samples)
 - **Metric module**: `deeprna.metrics.pseudoknot.evaluate_structure_metrics`, imported via `DEEPRNA_PATH` env var (default: `/home/xiwang/project/develop/deeprna`). **Called unmodified.**
@@ -486,8 +487,9 @@ iPKnot is explicitly a pseudoknot benchmark (test set = `bpRNA-PK-TS0-1K.pkl`, "
 
 Verifies the saved predictions still produce the §5/§6 standard F1:
 
-| Dataset | torcheval F1 (§5/§6) | sklearn F1 (`score` in pseudoknot metric) | Match? |
+| Dataset | torcheval F1 (§4/§5/§6) | sklearn F1 (`score` in pseudoknot metric) | Match? |
 |---|:---:|:---:|:---:|
+| UniRNA-SS | 0.1092 | 0.1092 | ✓ exact |
 | ArchiveII ≤600bp | 0.4463 | 0.4463 | ✓ exact |
 | iPKnot | 0.1246 | 0.1246 | ✓ exact |
 
@@ -495,14 +497,15 @@ Verifies the saved predictions still produce the §5/§6 standard F1:
 
 | Dataset | n_total | n_pk | score | score_pk | pk_sen | pk_ppv | **pk_f1** |
 |---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| UniRNA-SS | 1041 | 164 (15.8%) | 0.1092 | 0.0453 | 0.0012 | 0.0019 | **0.0013** |
 | ArchiveII ≤600bp | 3911 | 1039 (26.6%) | 0.4463 | 0.1061 | 0.0041 | 0.0076 | **0.0038** |
 | iPKnot (bpRNA-PK-TS0-1K) | 2914 | 353 (12.1%) | 0.1246 | 0.0577 | 0.0069 | 0.0125 | **0.0087** |
 
 ### Interpretation
 
-1. **E2Efold cannot predict pseudoknots.** `pk_f1 = 0.004` on ArchiveII and `pk_f1 = 0.009` on iPKnot. The `Lag_PP_mixed` / `postprocess()` augmented-Lagrangian solver enforces at most one partner per position, but has no term that represents or encourages crossing pairs. The `pk_sen` is near-zero (0.004 / 0.007) — the score network simply doesn't output high probability at crossing-pair positions, because neither training set (RNAStrAlign, bpRNA-TR0) has enough pseudoknot examples to drive this behavior.
+1. **E2Efold cannot predict pseudoknots.** `pk_f1` ranges from 0.001 (UniRNA-SS, ArchiveII) to 0.009 (iPKnot). The `Lag_PP_mixed` / `postprocess()` augmented-Lagrangian solver enforces at most one partner per position, but has no term that represents or encourages crossing pairs. The `pk_sen` is near-zero across all three datasets — the score network simply doesn't output high probability at crossing-pair positions, because no training set has enough pseudoknot examples to drive this behavior.
 
-2. **PK-containing samples are uniformly harder.** `score_pk` is ~4× lower than overall F1 on ArchiveII (0.106 vs 0.446) and ~2× lower on iPKnot (0.058 vs 0.125). The presence of a pseudoknot makes the entire sample harder to predict, not just the crossing pairs themselves.
+2. **PK-containing samples are uniformly harder.** `score_pk` is ~2–4× lower than overall F1 on all datasets: UniRNA-SS (0.045 vs 0.109), ArchiveII (0.106 vs 0.446), and iPKnot (0.058 vs 0.125). The presence of a pseudoknot makes the entire sample harder to predict, not just the crossing pairs themselves.
 
 3. **Comparison to UFold's PK evaluation** (same metric module, same datasets):
 
@@ -520,6 +523,12 @@ Verifies the saved predictions still produce the §5/§6 standard F1:
 ```bash
 export DEEPRNA_PATH=/home/xiwang/project/develop/deeprna  # or your checkout location
 
+# UniRNA-SS (~1 min, CPU only)
+python3 evaluate_pseudoknot.py \
+    --predictions experiment_unirna_ss/test_predictions.pkl \
+    --dataset_name "e2efold UniRNA-SS (n=1041)" \
+    | tee logs/unirna_ss_pseudoknot.log
+
 # ArchiveII (~12 min, CPU only)
 python3 evaluate_pseudoknot.py \
     --predictions experiment_archiveii_full/test_predictions.pkl \
@@ -535,9 +544,9 @@ python3 evaluate_pseudoknot.py \
 
 ### Legitimacy review
 
-- [x] No GPU re-inference, no model re-load — same predictions as §5 and §6.
+- [x] No GPU re-inference, no model re-load — same predictions as §4, §5, and §6.
 - [x] `pseudoknot.py` metric module used unmodified — imported via `sys.path`.
-- [x] `score` (sklearn F1) cross-checked against torcheval F1 from §5/§6 — exact match on both datasets (iPKnot 0.1246, ArchiveII 0.4463).
+- [x] `score` (sklearn F1) cross-checked against torcheval F1 from §4/§5/§6 — exact match on all three datasets (UniRNA-SS 0.1092, ArchiveII 0.4463, iPKnot 0.1246).
 - [x] No changes to training code, evaluation code, or data files.
 - [x] Script, logs, and all results documented in this file and in `CHANGE_LOG.md`.
 
