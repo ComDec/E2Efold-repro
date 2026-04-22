@@ -95,6 +95,20 @@ All modifications made to the original E2Efold repository for reproduction exper
 - **UniRNA-SS**: padded to 1018 (max seq length across all splits)
 - **iPKnot**: padded to 1000 (max seq length across train+test), val and test are identical (same source file `bpRNA-PK-TS0-1K.pkl`)
 
+## UniRNA-SS Pseudoknot Evaluation (2026-04-21)
+
+Reused existing `experiment_unirna_ss/test_predictions.pkl` (no re-inference) to compute pseudoknot-aware metrics via `evaluate_pseudoknot.py`.
+
+| Metric | Value |
+|---|:---:|
+| n_total / n_pk | 1041 / 164 (15.8%) |
+| score | 0.1092 (exact match to torcheval F1) |
+| score_pk | 0.0453 |
+| pk_sen / pk_ppv | 0.0012 / 0.0019 |
+| pk_f1 | 0.0013 |
+
+Updated: `Benchmark.md` §8 (added UniRNA-SS row), `README.md` §4 (added UniRNA-SS row), `scripts/eval_all.sh` (added PK-1 UniRNA-SS step). Log: `logs/unirna_ss_pseudoknot.log`.
+
 ## Reviewer Release Packaging (2026-04-10)
 
 ### New files
